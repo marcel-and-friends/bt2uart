@@ -1,0 +1,18 @@
+{
+  "search.exclude": {
+    "**/.cache": true,
+    "**/build": true
+  },
+  "idf.flashType": "UART",
+  "idf.adapterTargetName": "esp32",
+  "idf.customExtraPaths": "/Users/opalateste/.espressif/tools/xtensa-esp-elf-gdb/12.1_20221002/xtensa-esp-elf-gdb/bin:/Users/opalateste/.espressif/tools/riscv32-esp-elf-gdb/12.1_20221002/riscv32-esp-elf-gdb/bin:/Users/opalateste/.espressif/tools/xtensa-esp32-elf/esp-12.2.0_20230208/xtensa-esp32-elf/bin:/Users/opalateste/.espressif/tools/xtensa-esp32s2-elf/esp-12.2.0_20230208/xtensa-esp32s2-elf/bin:/Users/opalateste/.espressif/tools/xtensa-esp32s3-elf/esp-12.2.0_20230208/xtensa-esp32s3-elf/bin:/Users/opalateste/.espressif/tools/riscv32-esp-elf/esp-12.2.0_20230208/riscv32-esp-elf/bin:/Users/opalateste/.espressif/tools/esp32ulp-elf/2.35_20220830/esp32ulp-elf/bin:/Users/opalateste/.espressif/tools/openocd-esp32/v0.12.0-esp32-20230921/openocd-esp32/bin:/Users/opalateste/.espressif/tools/esp-rom-elfs/20230320",
+  "idf.customExtraVars": {
+    "OPENOCD_SCRIPTS": "/Users/opalateste/.espressif/tools/openocd-esp32/v0.12.0-esp32-20230921/openocd-esp32/share/openocd/scripts",
+    "ESP_ROM_ELF_DIR": "/Users/opalateste/.espressif/tools/esp-rom-elfs/20230320/"
+  },
+  "idf.espIdfPath": "/Users/opalateste/esp/esp-idf",
+  "idf.openOcdConfigs": ["board/esp32-bridge.cfg"],
+  "idf.port": "/dev/cu.usbserial-0001",
+  "idf.pythonBinPath": "/Users/opalateste/.espressif/python_env/idf5.1_py3.11_env/bin/python",
+  "idf.toolsPath": "/Users/opalateste/.espressif"
+}
