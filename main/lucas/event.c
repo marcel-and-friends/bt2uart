@@ -93,7 +93,7 @@ static void event_loop(void* octx) {
 }
 
 void lucas_event_send(lucas_event_t* event) {
-    assert(xQueueSend(s_event_queue, &event, portMAX_DELAY) == pdPASS);
+    assert(xQueueSend(s_event_queue, event, portMAX_DELAY) == pdPASS);
 }
 
 esp_err_t lucas_event_loop_init() {
@@ -101,7 +101,7 @@ esp_err_t lucas_event_loop_init() {
     //       this object has to live as long as the task itself, which is forever
     static struct event_loop_ctx_t ctx = { 0 };
 
-    if (lucas_fifo_init(&ctx.spp_fifo_buffer, LUCAS_UART_BUFFER_SIZE) == false)
+    if (!lucas_fifo_init(&ctx.spp_fifo_buffer, LUCAS_UART_BUFFER_SIZE))
         return ESP_ERR_NO_MEM;
 
     s_event_queue = xQueueCreate(20, sizeof(lucas_event_t));
