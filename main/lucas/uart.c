@@ -22,7 +22,7 @@ static void uart_event_loop(void* octx) {
 
         switch (event.type) {
         case UART_DATA:
-            LUCAS_LOGI("UART [%zu]", event.size);
+            LOGI("UART [%zu]", event.size);
             if (uart_read_bytes(LUCAS_UART_PORT, ctx->rx_buffer, event.size, portMAX_DELAY) <= 0)
                 break;
 
@@ -37,17 +37,17 @@ static void uart_event_loop(void* octx) {
             lucas_event_send(&lucas_event);
             break;
         case UART_FIFO_OVF:
-            LUCAS_LOGE("UART_FIFO_OVF");
+            LOGE("UART_FIFO_OVF");
             uart_flush_input(LUCAS_UART_PORT);
             xQueueReset(ctx->event_queue);
             break;
         case UART_BUFFER_FULL:
-            LUCAS_LOGE("UART_BUFFER_FULL");
+            LOGE("UART_BUFFER_FULL");
             uart_flush_input(LUCAS_UART_PORT);
             xQueueReset(ctx->event_queue);
             break;
         default:
-            LUCAS_LOGW("unhandled uart event: %d", event.type);
+            LOGW("unhandled uart event: %d", event.type);
             break;
         }
     }

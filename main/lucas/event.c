@@ -35,7 +35,7 @@ static void event_loop(void* octx) {
         case LUCAS_EVENT_UART_RECV:
             assert(event.recv.data && event.recv.len);
 
-            LUCAS_LOGI("received uart data \"%.*s\" [%zu bytes - %zu total]", (int)event.recv.len, event.recv.data, event.recv.len, ctx->spp_fifo_buffer.len);
+            LOGI("received uart data \"%.*s\" [%zu bytes - %zu total]", (int)event.recv.len, event.recv.data, event.recv.len, ctx->spp_fifo_buffer.len);
 
             // if there's no data currently buffered begin writing straight away
             // NOTE: this has to be evaluated before `lucas_fifo_push` so that the len is not affected by the push.
@@ -49,7 +49,7 @@ static void event_loop(void* octx) {
         case LUCAS_EVENT_SPP_RECV:
             assert(event.recv.data && event.recv.len && event.recv.len <= LUCAS_UART_BUFFER_SIZE);
 
-            LUCAS_LOGI("received spp data [%zu bytes]", event.recv.len);
+            LOGI("received spp data [%zu bytes]", event.recv.len);
             uart_write_bytes(LUCAS_UART_PORT, event.recv.data, event.recv.len);
 
             free(event.recv.data);
@@ -59,14 +59,14 @@ static void event_loop(void* octx) {
                    event.write_succeeded.num_bytes_written <= ctx->spp_fifo_buffer.len &&
                    !spp_congested);
 
-            LUCAS_LOGI("sucessful spp write [%zu bytes - %zu left]", event.write_succeeded.num_bytes_written, ctx->spp_fifo_buffer.len - event.write_succeeded.num_bytes_written);
+            LOGI("sucessful spp write [%zu bytes - %zu left]", event.write_succeeded.num_bytes_written, ctx->spp_fifo_buffer.len - event.write_succeeded.num_bytes_written);
 
             // pop the bytes that were written
             lucas_fifo_pop(&ctx->spp_fifo_buffer, event.write_succeeded.num_bytes_written);
 
             spp_congested = event.write_succeeded.congested;
             if (!spp_congested && ctx->spp_fifo_buffer.len) {
-                LUCAS_LOGI("continuing spp write [%zu bytes]", ctx->spp_fifo_buffer.len);
+                LOGI("continuing spp write [%zu bytes]", ctx->spp_fifo_buffer.len);
                 write_fifo_to_spp(&ctx->spp_fifo_buffer, g_shared_ctx.spp_handle);
             }
 
@@ -79,12 +79,12 @@ static void event_loop(void* octx) {
             // or because the last write failed but *not* because of congestion.
             spp_congested = false;
 
-            LUCAS_LOGW("retrying to write spp data [%zu bytes]", ctx->spp_fifo_buffer.len);
+            LOGW("retrying to write spp data [%zu bytes]", ctx->spp_fifo_buffer.len);
             write_fifo_to_spp(&ctx->spp_fifo_buffer, g_shared_ctx.spp_handle);
 
             break;
         case LUCAS_EVENT_SPP_CLEAR_BUFFER:
-            LUCAS_LOGW("cleared spp buffer [%zu bytes]", ctx->spp_fifo_buffer.len);
+            LOGW("cleared spp buffer [%zu bytes]", ctx->spp_fifo_buffer.len);
             lucas_fifo_clear(&ctx->spp_fifo_buffer);
 
             break;

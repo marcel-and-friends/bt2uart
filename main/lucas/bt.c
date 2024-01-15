@@ -37,44 +37,40 @@ struct gattc_profile_inst {
 
 static struct gattc_profile_inst g_gattc = { .gattc_if = ESP_GATT_IF_NONE };
 
-static char* bda2str(uint8_t* bda, char* str, size_t size) {
-    if (bda == NULL || str == NULL || size < 18)
-        return NULL;
+static char* bda2str(uint8_t* bda) {
+    static char output[18] = { 0 };
 
     uint8_t* p = bda;
-    sprintf(str, "%02x:%02x:%02x:%02x:%02x:%02x", p[0], p[1], p[2], p[3], p[4], p[5]);
-    return str;
+    sprintf(output, "%02x:%02x:%02x:%02x:%02x:%02x", p[0], p[1], p[2], p[3], p[4], p[5]);
+    return output;
 }
 
 static void bt_gap_cb(esp_bt_gap_cb_event_t event, esp_bt_gap_cb_param_t* param) {
-    char bda_str[18] = { 0 };
-
     switch (event) {
     case ESP_BT_GAP_DISC_STATE_CHANGED_EVT:
-        LUCAS_LOGI("ESP_BT_GAP_DISC_STATE_CHANGED_EVT");
+        LOGI("ESP_BT_GAP_DISC_STATE_CHANGED_EVT");
         break;
     case ESP_BT_GAP_AUTH_CMPL_EVT: {
         if (param->auth_cmpl.stat == ESP_BT_STATUS_SUCCESS) {
-            LUCAS_LOGI("authentication succeeded: %s bda:[%s]", param->auth_cmpl.device_name, bda2str(param->auth_cmpl.bda, bda_str, sizeof(bda_str)));
+            LOGI("authentication succeeded: %s bda:[%s]", param->auth_cmpl.device_name, bda2str(param->auth_cmpl.bda));
         } else {
-            LUCAS_LOGE("authentication failed, status:%d", param->auth_cmpl.stat);
+            LOGE("authentication failed, status:%d", param->auth_cmpl.stat);
         }
         break;
     }
     case ESP_BT_GAP_MODE_CHG_EVT:
-        LUCAS_LOGI("ESP_BT_GAP_MODE_CHG_EVT mode:%d bda:[%s]", param->mode_chg.mode, bda2str(param->mode_chg.bda, bda_str, sizeof(bda_str)));
+        LOGI("ESP_BT_GAP_MODE_CHG_EVT mode:%d bda:[%s]", param->mode_chg.mode, bda2str(param->mode_chg.bda));
         break;
     default:
-        LUCAS_LOGW("unhandled gap event: %d", event);
+        LOGW("unhandled gap event: %d", event);
         break;
     }
 }
 
 static void spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t* param) {
-    char bda_str[18] = { 0 };
     switch (event) {
     case ESP_SPP_WRITE_EVT:
-        LUCAS_LOGI("SPP_WRITE_EVT [%d]", param->write.len);
+        LOGI("SPP_WRITE_EVT [%d]", param->write.len);
         if (param->write.status == ESP_SPP_SUCCESS) {
             lucas_event_t event = {
                 .type = LUCAS_EVENT_SPP_WRITE_SUCCEEDED,
@@ -83,7 +79,7 @@ static void spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t* param) {
             };
             lucas_event_send(&event);
         } else {
-            LUCAS_LOGE("write failed");
+            LOGE("write failed");
             if (!param->cong.cong) {
                 // the write failed but not because of congestion, try again straight away.
                 // otherwise, on congestion, we'll retry when `ESP_SPP_CONG_EVT` tells us that the congestion is over
@@ -93,10 +89,10 @@ static void spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t* param) {
 
         g_shared_ctx.spp_handle = param->write.handle;
         if (param->write.cong)
-            LUCAS_LOGE("congested!");
+            LOGE("congested!");
         break;
     case ESP_SPP_DATA_IND_EVT: {
-        LUCAS_LOGI("SPP_DATA_IND_EVT [%d]", param->data_ind.len);
+        LOGI("SPP_DATA_IND_EVT [%d]", param->data_ind.len);
 
         // SAFETY: the main event loop is responsible for freeing this
         uint8_t* data = malloc(param->data_ind.len);
@@ -112,7 +108,7 @@ static void spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t* param) {
         g_shared_ctx.spp_handle = param->data_ind.handle;
     } break;
     case ESP_SPP_CONG_EVT:
-        LUCAS_LOGI("ESP_SPP_CONG_EVT");
+        LOGI("ESP_SPP_CONG_EVT");
         if (param->cong.status == ESP_SPP_SUCCESS) {
             // congestion is over!
             if (!param->cong.cong)
@@ -123,29 +119,29 @@ static void spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t* param) {
         break;
     case ESP_SPP_INIT_EVT:
         if (param->init.status == ESP_SPP_SUCCESS) {
-            LUCAS_LOGI("ESP_SPP_INIT_EVT");
+            LOGI("ESP_SPP_INIT_EVT");
 
             LOG_ERR(esp_spp_start_srv(ESP_SPP_SEC_AUTHENTICATE, ESP_SPP_ROLE_SLAVE, 0, SERVER_NAME));
 
             LUCAS_EVENT_SEND(LUCAS_EVENT_SPP_CLEAR_BUFFER);
         } else {
-            LUCAS_LOGE("ESP_SPP_INIT_EVT status:%d", param->init.status);
+            LOGE("ESP_SPP_INIT_EVT status:%d", param->init.status);
         }
         break;
     case ESP_SPP_START_EVT:
-        LUCAS_LOGI("ESP_SPP_START_EVT handle:%lu sec_id:%d scn:%d", param->start.handle, param->start.sec_id, param->start.scn);
+        LOGI("ESP_SPP_START_EVT handle:%lu sec_id:%d scn:%d", param->start.handle, param->start.sec_id, param->start.scn);
         break;
     case ESP_SPP_SRV_OPEN_EVT:
-        LUCAS_LOGI("ESP_SPP_SRV_OPEN_EVT status:%d handle:%lu rem_bda:[%s]", param->srv_open.status, param->srv_open.handle, bda2str(param->srv_open.rem_bda, bda_str, sizeof(bda_str)));
+        LOGI("ESP_SPP_SRV_OPEN_EVT status:%d handle:%lu rem_bda:[%s]", param->srv_open.status, param->srv_open.handle, bda2str(param->srv_open.rem_bda));
         LUCAS_EVENT_SEND(LUCAS_EVENT_SPP_CLEAR_BUFFER);
         break;
     case ESP_SPP_OPEN_EVT:
-        LUCAS_LOGI("ESP_SPP_OPEN_EVT");
+        LOGI("ESP_SPP_OPEN_EVT");
         LUCAS_EVENT_SEND(LUCAS_EVENT_SPP_CLEAR_BUFFER);
         g_shared_ctx.spp_handle = param->open.handle;
         break;
     case ESP_SPP_CLOSE_EVT:
-        LUCAS_LOGI(
+        LOGI(
             "ESP_SPP_CLOSE_EVT status:%d handle:%lu close_by_remote:%d",
             param->close.status,
             param->close.handle,
@@ -153,15 +149,15 @@ static void spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t* param) {
         g_shared_ctx.spp_handle = 0;
         break;
     case ESP_SPP_SRV_STOP_EVT:
-        LUCAS_LOGI("ESP_SPP_SRV_STOP_EVT");
+        LOGI("ESP_SPP_SRV_STOP_EVT");
         g_shared_ctx.spp_handle = 0;
         break;
     case ESP_SPP_UNINIT_EVT:
-        LUCAS_LOGI("ESP_SPP_UNINIT_EVT");
+        LOGI("ESP_SPP_UNINIT_EVT");
         g_shared_ctx.spp_handle = 0;
         break;
     default:
-        LUCAS_LOGW("unhandled spp event: %d", event);
+        LOGW("unhandled spp event: %d", event);
         break;
     }
 }
@@ -174,14 +170,14 @@ static void gap_ble_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t* par
         break;
     case ESP_GAP_BLE_SCAN_START_COMPLETE_EVT:
         if (param->scan_start_cmpl.status == ESP_BT_STATUS_SUCCESS)
-            LUCAS_LOGI("ble scan started");
+            LOGI("ble scan started");
         break;
     case ESP_GAP_BLE_SCAN_RESULT_EVT:
         if (param->scan_rst.search_evt == ESP_GAP_SEARCH_INQ_RES_EVT) {
             uint8_t device_name_len = 0;
             const char* device_name = (const char*)esp_ble_resolve_adv_data(param->scan_rst.ble_adv, ESP_BLE_AD_TYPE_NAME_CMPL, &device_name_len);
             if (device_name != NULL && param->scan_rst.rssi >= -50) {
-                LUCAS_LOGI("found device \"%.*s\"", device_name_len, device_name);
+                LOGI("found device \"%.*s\"", device_name_len, device_name);
                 if (strstr(device_name, DIFLUID_DEVICE_NAME) != NULL) {
                     LOG_ERR(esp_ble_gap_set_prefer_conn_params(param->scan_rst.bda, 32, 32, 0, 600));
                     LOG_ERR(esp_ble_gap_stop_scanning());
@@ -191,7 +187,7 @@ static void gap_ble_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t* par
         }
         break;
     default:
-        LUCAS_LOGW("unhandled ble gap event: %d", event);
+        LOGW("unhandled ble gap event: %d", event);
         break;
     }
 }
@@ -223,20 +219,20 @@ static void gattc_cb(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble
 
     switch (event) {
     case ESP_GATTC_REG_EVT:
-        LUCAS_LOGI("ESP_GATTC_REG_EVT");
+        LOGI("ESP_GATTC_REG_EVT");
         if (param->reg.status == ESP_GATT_OK) {
-            LUCAS_LOGI("registering gatt client, app_id: %hu, if: %hu", param->reg.app_id, gattc_if);
+            LOGI("registering gatt client, app_id: %hu, if: %hu", param->reg.app_id, gattc_if);
             g_gattc.gattc_if = gattc_if;
             LOG_ERR(esp_ble_gap_set_scan_params(&ble_scan_params));
         }
         break;
     case ESP_GATTC_OPEN_EVT:
-        LUCAS_LOGE("ESP_GATTC_OPEN_EVT - status = 0x%x", param->open.status);
+        LOGE("ESP_GATTC_OPEN_EVT - status = 0x%x", param->open.status);
         if (param->open.status == ESP_GATT_OK)
-            LUCAS_LOGI("successfully opened");
+            LOGI("successfully opened");
         break;
     case ESP_GATTC_CONNECT_EVT:
-        LUCAS_LOGI("ESP_GATTC_CONNECT_EVT conn_id %d, if %d", param->connect.conn_id, gattc_if);
+        LOGI("ESP_GATTC_CONNECT_EVT conn_id %d, if %d", param->connect.conn_id, gattc_if);
 
         g_gattc.conn_id = param->connect.conn_id;
         memcpy(g_gattc.remote_bda, param->connect.remote_bda, sizeof(esp_bd_addr_t));
@@ -244,42 +240,42 @@ static void gattc_cb(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble
         LOG_ERR(esp_ble_gattc_send_mtu_req(gattc_if, param->connect.conn_id));
         break;
     case ESP_GATTC_DISCONNECT_EVT:
-        LUCAS_LOGE("ESP_GATTC_DISCONNECT_EVT, reason = 0x%x", param->disconnect.reason);
+        LOGE("ESP_GATTC_DISCONNECT_EVT, reason = 0x%x", param->disconnect.reason);
         break;
     case ESP_GATTC_CFG_MTU_EVT:
-        LUCAS_LOGI("ESP_GATTC_CFG_MTU_EVT");
+        LOGI("ESP_GATTC_CFG_MTU_EVT");
         if (param->cfg_mtu.status != ESP_GATT_OK)
-            LUCAS_LOGI("ESP_GATTC_CFG_MTU_EVT, Status %d, MTU %d, conn_id %d", param->cfg_mtu.status, param->cfg_mtu.mtu, param->cfg_mtu.conn_id);
+            LOGI("ESP_GATTC_CFG_MTU_EVT, Status %d, MTU %d, conn_id %d", param->cfg_mtu.status, param->cfg_mtu.mtu, param->cfg_mtu.conn_id);
         break;
     case ESP_GATTC_DIS_SRVC_CMPL_EVT:
         if (param->dis_srvc_cmpl.status != ESP_GATT_OK) {
-            LUCAS_LOGE("discover service failed, status %d", param->dis_srvc_cmpl.status);
+            LOGE("discover service failed, status %d", param->dis_srvc_cmpl.status);
             break;
         }
-        LUCAS_LOGI("discover service complete conn_id %d", param->dis_srvc_cmpl.conn_id);
+        LOGI("discover service complete conn_id %d", param->dis_srvc_cmpl.conn_id);
         LOG_ERR(esp_ble_gattc_search_service(gattc_if, param->cfg_mtu.conn_id, &remote_filter_service_uuid));
         break;
     case ESP_GATTC_SEARCH_RES_EVT:
-        LUCAS_LOGI("SEARCH RES: conn_id = %x is primary service %d", param->search_res.conn_id, param->search_res.is_primary);
-        LUCAS_LOGI("start handle %d end handle %d current handle value %d", param->search_res.start_handle, param->search_res.end_handle, param->search_res.srvc_id.inst_id);
+        LOGI("SEARCH RES: conn_id = %x is primary service %d", param->search_res.conn_id, param->search_res.is_primary);
+        LOGI("start handle %d end handle %d current handle value %d", param->search_res.start_handle, param->search_res.end_handle, param->search_res.srvc_id.inst_id);
 
-        LUCAS_LOGI("service found");
-        LUCAS_LOGI("UUID16: %x", param->search_res.srvc_id.uuid.uuid.uuid16);
+        LOGI("service found");
+        LOGI("UUID16: %x", param->search_res.srvc_id.uuid.uuid.uuid16);
         g_gattc.service_start_handle = param->search_res.start_handle;
         g_gattc.service_end_handle = param->search_res.end_handle;
         break;
     case ESP_GATTC_SEARCH_CMPL_EVT:
         if (param->search_cmpl.status != ESP_GATT_OK) {
-            LUCAS_LOGE("search service failed, error status = %x", param->search_cmpl.status);
+            LOGE("search service failed, error status = %x", param->search_cmpl.status);
             break;
         }
 
         if (param->search_cmpl.searched_service_source == ESP_GATT_SERVICE_FROM_REMOTE_DEVICE) {
-            LUCAS_LOGI("got service information from remote device");
+            LOGI("got service information from remote device");
         } else if (param->search_cmpl.searched_service_source == ESP_GATT_SERVICE_FROM_NVS_FLASH) {
-            LUCAS_LOGI("got service information from flash");
+            LOGI("got service information from flash");
         } else {
-            LUCAS_LOGI("unknown service source");
+            LOGI("unknown service source");
         }
 
         uint16_t count = 0;
@@ -314,9 +310,9 @@ static void gattc_cb(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble
 
         break;
     case ESP_GATTC_REG_FOR_NOTIFY_EVT: {
-        LUCAS_LOGI("ESP_GATTC_REG_FOR_NOTIFY_EVT");
+        LOGI("ESP_GATTC_REG_FOR_NOTIFY_EVT");
         if (param->reg_for_notify.status != ESP_GATT_OK) {
-            LUCAS_LOGE("REG FOR NOTIFY failed: error status = %d", param->reg_for_notify.status);
+            LOGE("REG FOR NOTIFY failed: error status = %d", param->reg_for_notify.status);
             break;
         }
 
@@ -368,33 +364,32 @@ static void gattc_cb(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble
     }
     case ESP_GATTC_NOTIFY_EVT:
         if (param->notify.is_notify) {
-            LUCAS_LOGI("ESP_GATTC_NOTIFY_EVT, receive notify value:");
+            LOGI("ESP_GATTC_NOTIFY_EVT, receive notify value:");
         } else {
-            LUCAS_LOGI("ESP_GATTC_NOTIFY_EVT, receive indicate value:");
+            LOGI("ESP_GATTC_NOTIFY_EVT, receive indicate value:");
         }
         esp_log_buffer_hex(LUCAS_LOG_TAG, param->notify.value, param->notify.value_len);
         break;
     case ESP_GATTC_WRITE_DESCR_EVT:
         if (param->write.status != ESP_GATT_OK) {
-            LUCAS_LOGE("write descr failed, error status = %x", param->write.status);
+            LOGE("write descr failed, error status = %x", param->write.status);
             break;
         }
-        LUCAS_LOGI("write descr success ");
+        LOGI("write descr success ");
         break;
     case ESP_GATTC_SRVC_CHG_EVT: {
-        LUCAS_LOGI("ESP_GATTC_SRVC_CHG_EVT, bd_addr:");
-        esp_log_buffer_hex(LUCAS_LOG_TAG, param->srvc_chg.remote_bda, sizeof(esp_bd_addr_t));
+        LOGI("ESP_GATTC_SRVC_CHG_EVT, bd_addr: %s", bda2str(param->srvc_chg.remote_bda));
         break;
     }
     case ESP_GATTC_WRITE_CHAR_EVT:
         if (param->write.status != ESP_GATT_OK) {
-            LUCAS_LOGE("write char failed, error status = %x", param->write.status);
+            LOGE("write char failed, error status = %x", param->write.status);
             break;
         }
-        LUCAS_LOGI("write char success ");
+        LOGI("write char success ");
         break;
     default:
-        LUCAS_LOGW("unhadled gatcc event: %d", event);
+        LOGW("unhadled gatcc event: %d", event);
         break;
     }
 }
@@ -446,8 +441,7 @@ esp_err_t lucas_bt_init() {
     TRY(esp_bt_controller_init(&bt_cfg));
     TRY(esp_bt_controller_enable(bt_cfg.mode));
 
-    esp_bluedroid_config_t bluedroid_cfg = { .ssp_en = false };
-    TRY(esp_bluedroid_init_with_cfg(&bluedroid_cfg));
+    TRY(esp_bluedroid_init());
     TRY(esp_bluedroid_enable());
 
     TRY(init_classic_bt());
