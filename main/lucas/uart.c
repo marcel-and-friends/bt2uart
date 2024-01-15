@@ -70,11 +70,11 @@ esp_err_t lucas_uart_init() {
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .source_clk = UART_SCLK_DEFAULT
     };
-    LUCAS_ESP_TRY(uart_param_config(LUCAS_UART_PORT, &uart_config));
-    LUCAS_ESP_TRY(uart_set_pin(LUCAS_UART_PORT, 17, 16, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
-    LUCAS_ESP_TRY(uart_driver_install(LUCAS_UART_PORT, LUCAS_UART_BUFFER_SIZE, LUCAS_UART_BUFFER_SIZE, 20, &ctx.event_queue, 0));
+    TRY(uart_param_config(LUCAS_UART_PORT, &uart_config));
+    TRY(uart_set_pin(LUCAS_UART_PORT, 17, 16, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+    TRY(uart_driver_install(LUCAS_UART_PORT, LUCAS_UART_BUFFER_SIZE, LUCAS_UART_BUFFER_SIZE, 20, &ctx.event_queue, 0));
 
-    LUCAS_FREERTOS_TRY(xTaskCreate(uart_event_loop, "UART", 4096, &ctx, 20, NULL));
+    RTOS_TRY(xTaskCreate(uart_event_loop, "UART", 4096, &ctx, 20, NULL));
 
     return ESP_OK;
 }

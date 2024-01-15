@@ -5,9 +5,9 @@
 #include <lucas/bt.h>
 
 esp_err_t lucas_init() {
-    LUCAS_ESP_TRY(lucas_uart_init());
-    LUCAS_ESP_TRY(lucas_event_loop_init());
-    LUCAS_ESP_TRY(lucas_bt_init());
+    TRY(lucas_uart_init());
+    TRY(lucas_event_loop_init());
+    TRY(lucas_bt_init());
 
     return ESP_OK;
 }

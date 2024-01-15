@@ -108,7 +108,7 @@ esp_err_t lucas_event_loop_init() {
     if (s_event_queue == NULL)
         return ESP_ERR_NO_MEM;
 
-    LUCAS_FREERTOS_TRY(xTaskCreate(event_loop, "MAIN", 4096, &ctx, 16, NULL));
+    RTOS_TRY(xTaskCreate(event_loop, "MAIN", 4096, &ctx, 16, NULL));
 
     return ESP_OK;
 }
