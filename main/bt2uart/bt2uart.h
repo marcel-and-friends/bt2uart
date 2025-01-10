@@ -2,4 +2,4 @@
 
 #include <esp_err.h>
 
-esp_err_t lucas_bt_init();
+esp_err_t bt2uart_init();

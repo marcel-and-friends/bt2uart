@@ -1,17 +1,17 @@
 #pragma once
 
-#include <stdint.h>
-#include <stddef.h>
-#include <stdbool.h>
 #include <esp_err.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
 #define LUCAS_EVENT_SEND(t)                  \
     do {                                     \
-        lucas_event_t event = { .type = t }; \
-        lucas_event_send(&event);            \
+        bt2uart_event_t event = { .type = t }; \
+        bt2uart_event_send(&event);            \
     } while (0)
 
-enum lucas_event_type_t {
+enum bt2uart_event_type_t {
     // data received through uart
     LUCAS_EVENT_UART_RECV,
 
@@ -31,7 +31,7 @@ enum lucas_event_type_t {
 };
 
 typedef struct {
-    enum lucas_event_type_t type;
+    enum bt2uart_event_type_t type;
 
     union {
         struct {
@@ -44,8 +44,8 @@ typedef struct {
             bool congested;
         } write_succeeded;
     };
-} lucas_event_t;
+} bt2uart_event_t;
 
-void lucas_event_send(lucas_event_t*);
+void bt2uart_event_send(bt2uart_event_t*);
 
-esp_err_t lucas_event_loop_init();
+esp_err_t bt2uart_event_loop_init();

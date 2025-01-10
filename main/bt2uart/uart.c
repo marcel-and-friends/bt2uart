@@ -1,12 +1,12 @@
 #include "uart.h"
-#include <string.h>
 #include <driver/uart.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
-#include <lucas/shared.h>
-#include <lucas/event.h>
-#include <lucas/util/log.h>
-#include <lucas/util/err.h>
+#include <bt2uart/event.h>
+#include <bt2uart/shared.h>
+#include <bt2uart/util/err.h>
+#include <bt2uart/util/log.h>
+#include <string.h>
 
 struct uart_event_loop_ctx_t {
     QueueHandle_t event_queue;
@@ -30,11 +30,11 @@ static void uart_event_loop(void* octx) {
             uint8_t* data = malloc(event.size);
             memcpy(data, ctx->rx_buffer, event.size);
 
-            lucas_event_t lucas_event = {
+            bt2uart_event_t bt2uart_event = {
                 .type = LUCAS_EVENT_UART_RECV,
-                .recv = {data, .len = event.size}
+                .recv = { data, .len = event.size }
             };
-            lucas_event_send(&lucas_event);
+            bt2uart_event_send(&bt2uart_event);
             break;
         case UART_FIFO_OVF:
             LOGE("UART_FIFO_OVF");
@@ -53,7 +53,7 @@ static void uart_event_loop(void* octx) {
     }
 }
 
-esp_err_t lucas_uart_init() {
+esp_err_t bt2uart_uart_init() {
     // NOTE: the static lifetime is very important,
     //       this object has to live as long as the task itself, which is forever
     static struct uart_event_loop_ctx_t ctx = { 0 };

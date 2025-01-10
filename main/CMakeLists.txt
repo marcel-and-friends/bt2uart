@@ -1,9 +1,12 @@
-idf_component_register(SRCS
-    "main.c"
-    "lucas/util/fifo.c"
-    "lucas/bt.c"
-    "lucas/event.c"
-    "lucas/lucas.c"
-    "lucas/shared.c"
-    "lucas/uart.c"
-    INCLUDE_DIRS ".")
+idf_component_register(
+    SRCS
+        "main.c"
+        "bt2uart/util/fifo.c"
+        "bt2uart/bt.c"
+        "bt2uart/event.c"
+        "bt2uart/bt2uart.c"
+        "bt2uart/shared.c"
+        "bt2uart/uart.c"
+    INCLUDE_DIRS 
+        "."
+)
