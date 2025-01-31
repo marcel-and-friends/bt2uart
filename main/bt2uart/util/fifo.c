@@ -25,6 +25,9 @@ void bt2uart_fifo_free(bt2uart_fifo_t* this) {
 }
 
 void bt2uart_fifo_push(bt2uart_fifo_t* this, uint8_t* data, size_t len) {
+    if (len == 0)
+        return;
+
     const size_t available_space = this->cap - this->len;
     if (len > available_space) {
         const size_t missing_space = len - available_space;
@@ -40,6 +43,9 @@ void bt2uart_fifo_push(bt2uart_fifo_t* this, uint8_t* data, size_t len) {
 }
 
 void bt2uart_fifo_pop(bt2uart_fifo_t* this, size_t num) {
+    if (num == 0)
+        return;
+
     assert(num <= this->len);
 
     if (num != this->len)

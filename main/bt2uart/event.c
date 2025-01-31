@@ -1,13 +1,13 @@
 #include "event.h"
-#include <driver/uart.h>
-#include <esp_spp_api.h>
-#include <freertos/FreeRTOS.h>
-#include <freertos/queue.h>
 #include <bt2uart/shared.h>
 #include <bt2uart/uart.h>
 #include <bt2uart/util/err.h>
 #include <bt2uart/util/fifo.h>
 #include <bt2uart/util/log.h>
+#include <driver/uart.h>
+#include <esp_spp_api.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
 
 struct event_loop_ctx_t {
     bt2uart_fifo_t spp_fifo_buffer;
@@ -33,6 +33,11 @@ static void event_loop(void* octx) {
 
         switch (event.type) {
         case LUCAS_EVENT_UART_RECV:
+            if (!g_shared_ctx.spp_handle) {
+                free(event.recv.data);
+                break;
+            }
+
             assert(event.recv.data && event.recv.len);
 
             LOGI("received uart data \"%.*s\" [%zu bytes - %zu total]", (int)event.recv.len, event.recv.data, event.recv.len, ctx->spp_fifo_buffer.len);

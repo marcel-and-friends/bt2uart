@@ -1,11 +1,11 @@
 #include "uart.h"
-#include <driver/uart.h>
-#include <freertos/FreeRTOS.h>
-#include <freertos/queue.h>
 #include <bt2uart/event.h>
 #include <bt2uart/shared.h>
 #include <bt2uart/util/err.h>
 #include <bt2uart/util/log.h>
+#include <driver/uart.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
 #include <string.h>
 
 struct uart_event_loop_ctx_t {
