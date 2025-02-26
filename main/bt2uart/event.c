@@ -16,11 +16,14 @@ struct event_loop_ctx_t {
 static QueueHandle_t s_event_queue = NULL;
 
 static void write_fifo_to_spp(bt2uart_fifo_t* fifo, uint32_t spp_handle) {
+    if (!spp_handle)
+        return;
+
     // SAFETY: this function deep copies the buffer internally,
     //         there's no need to worry about modifications to the fifo being made before the transfer is finished
     //         https://github.com/espressif/esp-idf/blob/release/v5.2/components/bt/host/bluedroid/btc/profile/std/spp/btc_spp.c#L1442C13-L1442C33
     //         see the `btc_spp_arg_deep_copy` param
-    esp_spp_write(spp_handle, fifo->len, fifo->data);
+    LOG_ERR(esp_spp_write(spp_handle, fifo->len, fifo->data));
 }
 
 static void event_loop(void* octx) {

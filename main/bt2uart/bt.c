@@ -29,28 +29,61 @@ static const char* bda2str(const uint8_t* bda) {
 
 static void bt_gap_cb(esp_bt_gap_cb_event_t event, esp_bt_gap_cb_param_t* param) {
     switch (event) {
-    case ESP_BT_GAP_DISC_STATE_CHANGED_EVT:
-        LOGI("ESP_BT_GAP_DISC_STATE_CHANGED_EVT");
-        break;
     case ESP_BT_GAP_AUTH_CMPL_EVT: {
         if (param->auth_cmpl.stat == ESP_BT_STATUS_SUCCESS) {
-            LOGI("authentication succeeded: %s bda:[%s]", param->auth_cmpl.device_name, bda2str(param->auth_cmpl.bda));
+            LOGI("Authentication succeeded: %s bda:[%s]", param->auth_cmpl.device_name, bda2str(param->auth_cmpl.bda));
         } else {
-            LOGE("authentication failed, status:%d", param->auth_cmpl.stat);
+            LOGE("Authentication failed, status:%d", param->auth_cmpl.stat);
         }
         break;
     }
-    case ESP_BT_GAP_MODE_CHG_EVT:
-        LOGI("ESP_BT_GAP_MODE_CHG_EVT mode:%d bda:[%s]", param->mode_chg.mode, bda2str(param->mode_chg.bda));
-        break;
     default:
-        LOGW("unhandled gap event: %d", event);
+        LOGW("Unhandled gap event: %d", event);
         break;
     }
 }
 
 static void spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t* param) {
     switch (event) {
+    case ESP_SPP_INIT_EVT:
+        if (param->init.status == ESP_SPP_SUCCESS) {
+            LOGI("ESP_SPP_INIT_EVT");
+            LOG_ERR(esp_spp_start_srv(ESP_SPP_SEC_AUTHENTICATE, ESP_SPP_ROLE_SLAVE, 0, SERVER_NAME));
+        } else {
+            LOGE("ESP_SPP_INIT_EVT status:%d", param->init.status);
+        }
+        break;
+    case ESP_SPP_START_EVT: {
+        if (param->start.status == ESP_SPP_SUCCESS) {
+            LOG_ERR(esp_bt_gap_set_device_name(DEVICE_NAME));
+            LOG_ERR(esp_bt_gap_set_scan_mode(ESP_BT_CONNECTABLE, ESP_BT_GENERAL_DISCOVERABLE));
+        }
+        LOGI("ESP_SPP_START_EVT handle:%lu sec_id:%d scn:%d", param->start.handle, param->start.sec_id, param->start.scn);
+    } break;
+    case ESP_SPP_SRV_OPEN_EVT:
+        LOGI("ESP_SPP_SRV_OPEN_EVT status:%d handle:%lu rem_bda:[%s]", param->srv_open.status, param->srv_open.handle, bda2str(param->srv_open.rem_bda));
+        LUCAS_EVENT_SEND(LUCAS_EVENT_SPP_CLEAR_BUFFER);
+        g_shared_ctx.spp_handle = param->srv_open.handle;
+        break;
+    case ESP_SPP_SRV_STOP_EVT:
+        LOGI("ESP_SPP_SRV_STOP_EVT");
+        LUCAS_EVENT_SEND(LUCAS_EVENT_SPP_CLEAR_BUFFER);
+        g_shared_ctx.spp_handle = 0;
+        break;
+    case ESP_SPP_OPEN_EVT:
+        LOGI("ESP_SPP_OPEN_EVT");
+        LUCAS_EVENT_SEND(LUCAS_EVENT_SPP_CLEAR_BUFFER);
+        g_shared_ctx.spp_handle = param->open.handle;
+        break;
+    case ESP_SPP_CLOSE_EVT:
+        LOGI(
+            "ESP_SPP_CLOSE_EVT status:%d handle:%lu close_by_remote:%d",
+            param->close.status,
+            param->close.handle,
+            param->close.async);
+        LUCAS_EVENT_SEND(LUCAS_EVENT_SPP_CLEAR_BUFFER);
+        g_shared_ctx.spp_handle = 0;
+        break;
     case ESP_SPP_WRITE_EVT:
         LOGI("SPP_WRITE_EVT [%d]", param->write.len);
         if (param->write.status == ESP_SPP_SUCCESS) {
@@ -71,7 +104,6 @@ static void spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t* param) {
             }
         }
 
-        g_shared_ctx.spp_handle = param->write.handle;
         if (param->write.cong)
             LOGE("congested!");
         break;
@@ -90,8 +122,6 @@ static void spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t* param) {
             }
         };
         bt2uart_event_send(&event);
-
-        g_shared_ctx.spp_handle = param->data_ind.handle;
     } break;
     case ESP_SPP_CONG_EVT:
         LOGI("ESP_SPP_CONG_EVT");
@@ -100,62 +130,36 @@ static void spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t* param) {
             if (!param->cong.cong)
                 LUCAS_EVENT_SEND(LUCAS_EVENT_SPP_CONGESTION_ENDED);
         }
-
-        g_shared_ctx.spp_handle = param->cong.handle;
-        break;
-    case ESP_SPP_INIT_EVT:
-        if (param->init.status == ESP_SPP_SUCCESS) {
-            LOGI("ESP_SPP_INIT_EVT");
-
-            LOG_ERR(esp_spp_start_srv(ESP_SPP_SEC_AUTHENTICATE, ESP_SPP_ROLE_SLAVE, 0, SERVER_NAME));
-
-            LUCAS_EVENT_SEND(LUCAS_EVENT_SPP_CLEAR_BUFFER);
-        } else {
-            LOGE("ESP_SPP_INIT_EVT status:%d", param->init.status);
-        }
-        break;
-    case ESP_SPP_START_EVT:
-        LOGI("ESP_SPP_START_EVT handle:%lu sec_id:%d scn:%d", param->start.handle, param->start.sec_id, param->start.scn);
-        break;
-    case ESP_SPP_SRV_OPEN_EVT:
-        LOGI("ESP_SPP_SRV_OPEN_EVT status:%d handle:%lu rem_bda:[%s]", param->srv_open.status, param->srv_open.handle, bda2str(param->srv_open.rem_bda));
-        LUCAS_EVENT_SEND(LUCAS_EVENT_SPP_CLEAR_BUFFER);
-        break;
-    case ESP_SPP_OPEN_EVT:
-        LOGI("ESP_SPP_OPEN_EVT");
-        LUCAS_EVENT_SEND(LUCAS_EVENT_SPP_CLEAR_BUFFER);
-        g_shared_ctx.spp_handle = param->open.handle;
-        break;
-    case ESP_SPP_CLOSE_EVT:
-        LOGI(
-            "ESP_SPP_CLOSE_EVT status:%d handle:%lu close_by_remote:%d",
-            param->close.status,
-            param->close.handle,
-            param->close.async);
-        g_shared_ctx.spp_handle = 0;
-        break;
-    case ESP_SPP_SRV_STOP_EVT:
-        LOGI("ESP_SPP_SRV_STOP_EVT");
-        g_shared_ctx.spp_handle = 0;
         break;
     case ESP_SPP_UNINIT_EVT:
         LOGI("ESP_SPP_UNINIT_EVT");
-        g_shared_ctx.spp_handle = 0;
         break;
     default:
-        LOGW("unhandled spp event: %d", event);
+        LOGW("Unhandled spp event: %d", event);
         break;
     }
 }
 
-static esp_err_t init_classic_bt() {
-    // device
-    TRY(esp_bt_gap_set_device_name(DEVICE_NAME));
+esp_err_t bt2uart_bt_init() {
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
 
-    // gap
-    esp_bt_pin_code_t pin_code = PIN;
-    TRY(esp_bt_gap_set_pin(ESP_BT_PIN_TYPE_FIXED, strlen(PIN), pin_code));
-    TRY(esp_bt_gap_set_scan_mode(ESP_BT_CONNECTABLE, ESP_BT_GENERAL_DISCOVERABLE));
+    TRY(esp_bt_controller_mem_release(ESP_BT_MODE_BLE));
+
+    esp_bluedroid_config_t bd_cfg = {
+        .ssp_en = false
+    };
+
+    esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
+    TRY(esp_bt_controller_init(&bt_cfg));
+    TRY(esp_bt_controller_enable(bt_cfg.mode));
+
+    TRY(esp_bluedroid_init_with_cfg(&bd_cfg));
+    TRY(esp_bluedroid_enable());
 
     // callbacks
     TRY(esp_bt_gap_register_callback(bt_gap_cb));
@@ -168,28 +172,8 @@ static esp_err_t init_classic_bt() {
     };
     TRY(esp_spp_enhanced_init(&spp_cfg));
 
-    return ESP_OK;
-}
-
-esp_err_t bt2uart_bt_init() {
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(ret);
-
-    esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
-    TRY(esp_bt_controller_init(&bt_cfg));
-    TRY(esp_bt_controller_enable(bt_cfg.mode));
-
-    esp_bluedroid_config_t bd_cfg = {
-        .ssp_en = false
-    };
-    TRY(esp_bluedroid_init_with_cfg(&bd_cfg));
-    TRY(esp_bluedroid_enable());
-
-    TRY(init_classic_bt());
+    esp_bt_pin_code_t pin_code = PIN;
+    TRY(esp_bt_gap_set_pin(ESP_BT_PIN_TYPE_FIXED, strlen(PIN), pin_code));
 
     return ESP_OK;
 }
