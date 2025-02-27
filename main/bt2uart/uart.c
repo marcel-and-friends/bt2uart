@@ -12,6 +12,10 @@ struct uart_event_loop_ctx_t {
     uint8_t rx_buffer[UART_BUFFER_SIZE];
 };
 
+#define STACK_SIZE 4096
+static StaticTask_t s_task_data;
+static uint8_t s_task_stack[STACK_SIZE];
+
 static void uart_event_loop(void* octx) {
     struct uart_event_loop_ctx_t* ctx = octx;
 
@@ -68,7 +72,7 @@ esp_err_t bt2uart_uart_init() {
     TRY(uart_set_pin(UART_PORT, 17, 16, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
     TRY(uart_driver_install(UART_PORT, UART_BUFFER_SIZE, UART_BUFFER_SIZE, 20, &ctx.event_queue, 0));
 
-    RTOS_TRY(xTaskCreate(uart_event_loop, "UART", 4096, &ctx, 20, NULL));
+    xTaskCreateStatic(uart_event_loop, "UART", STACK_SIZE, &ctx, 20, s_task_stack, &s_task_data);
 
     return ESP_OK;
 }

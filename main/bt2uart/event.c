@@ -14,7 +14,14 @@ struct event_loop_ctx_t {
     bool spp_congested;
 };
 
-static QueueHandle_t s_event_queue = NULL;
+#define QUEUE_LENGTH 20
+static QueueHandle_t s_event_queue;
+static StaticQueue_t s_event_queue_data;
+static uint8_t s_event_queue_storage[QUEUE_LENGTH * sizeof(bt2uart_event_t)];
+
+#define STACK_SIZE 4096
+static StaticTask_t s_task_data;
+static uint8_t s_task_stack[STACK_SIZE];
 
 static void write_fifo_to_spp(bt2uart_fifo_t* fifo, uint32_t spp_handle) {
     // SAFETY: this function deep copies the buffer internally,
@@ -105,14 +112,9 @@ esp_err_t bt2uart_event_loop_init() {
     //       this object has to live as long as the task itself, which is forever
     static struct event_loop_ctx_t ctx = { 0 };
 
-    if (!bt2uart_fifo_init(&ctx.spp_fifo_buffer, UART_PORT))
-        return ESP_ERR_NO_MEM;
-
-    s_event_queue = xQueueCreate(20, sizeof(bt2uart_event_t));
-    if (s_event_queue == NULL)
-        return ESP_ERR_NO_MEM;
-
-    RTOS_TRY(xTaskCreate(event_loop, "MAIN", 4096, &ctx, 16, NULL));
+    s_event_queue = xQueueCreateStatic(QUEUE_LENGTH, sizeof(bt2uart_event_t), s_event_queue_storage, &s_event_queue_data);
+    TRY(bt2uart_fifo_init(&ctx.spp_fifo_buffer, UART_PORT));
+    xTaskCreateStatic(event_loop, "MAIN", STACK_SIZE, &ctx, 16, s_task_stack, &s_task_data);
 
     return ESP_OK;
 }

@@ -4,15 +4,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-bool bt2uart_fifo_init(bt2uart_fifo_t* this, size_t initial_cap) {
+esp_err_t bt2uart_fifo_init(bt2uart_fifo_t* this, size_t initial_cap) {
     this->data = malloc(initial_cap);
     if (this->data == NULL)
-        return false;
+        return ESP_ERR_NO_MEM;
 
     this->cap = initial_cap;
     this->len = 0;
 
-    return true;
+    return ESP_OK;
 }
 
 void bt2uart_fifo_clear(bt2uart_fifo_t* this) {
