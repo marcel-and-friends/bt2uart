@@ -9,5 +9,7 @@ CompileFlags:
             -fstrict-volatile-bitfields,
         ]
 
+    Add: [-D__INT32_TYPE__=long int, -D__UINT32_TYPE__=long unsigned int]
+
 Diagnostics:
     Suppress: attribute_section_invalid_for_target
