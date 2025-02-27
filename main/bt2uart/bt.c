@@ -1,6 +1,5 @@
 #include "bt.h"
 #include <bt2uart/event.h>
-#include <bt2uart/shared.h>
 #include <bt2uart/util/err.h>
 #include <bt2uart/util/log.h>
 #include <esp_bt.h>
@@ -62,45 +61,57 @@ static void spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t* param) {
     } break;
     case ESP_SPP_SRV_OPEN_EVT:
         LOGI("ESP_SPP_SRV_OPEN_EVT status:%d handle:%lu rem_bda:[%s]", param->srv_open.status, param->srv_open.handle, bda2str(param->srv_open.rem_bda));
-        LUCAS_EVENT_SEND(LUCAS_EVENT_SPP_CLEAR_BUFFER);
-        g_shared_ctx.spp_handle = param->srv_open.handle;
+        bt2uart_event_send(&(bt2uart_event_t) {
+            .type = BT2UART_EVENT_SPP_RESET,
+            .reset = {
+                .spp_handle = param->srv_open.handle,
+            },
+        });
         break;
     case ESP_SPP_SRV_STOP_EVT:
         LOGI("ESP_SPP_SRV_STOP_EVT");
-        LUCAS_EVENT_SEND(LUCAS_EVENT_SPP_CLEAR_BUFFER);
-        g_shared_ctx.spp_handle = 0;
+        bt2uart_event_send(&(bt2uart_event_t) {
+            .type = BT2UART_EVENT_SPP_RESET,
+            .reset = {
+                .spp_handle = 0,
+            },
+        });
         break;
     case ESP_SPP_OPEN_EVT:
         LOGI("ESP_SPP_OPEN_EVT");
-        LUCAS_EVENT_SEND(LUCAS_EVENT_SPP_CLEAR_BUFFER);
-        g_shared_ctx.spp_handle = param->open.handle;
+        bt2uart_event_send(&(bt2uart_event_t) {
+            .type = BT2UART_EVENT_SPP_RESET,
+            .reset = {
+                .spp_handle = param->open.handle,
+            },
+        });
         break;
     case ESP_SPP_CLOSE_EVT:
-        LOGI(
-            "ESP_SPP_CLOSE_EVT status:%d handle:%lu close_by_remote:%d",
-            param->close.status,
-            param->close.handle,
-            param->close.async);
-        LUCAS_EVENT_SEND(LUCAS_EVENT_SPP_CLEAR_BUFFER);
-        g_shared_ctx.spp_handle = 0;
+        bt2uart_event_send(&(bt2uart_event_t) {
+            .type = BT2UART_EVENT_SPP_RESET,
+            .reset = {
+                .spp_handle = 0,
+            },
+        });
         break;
     case ESP_SPP_WRITE_EVT:
         LOGI("SPP_WRITE_EVT [%d]", param->write.len);
         if (param->write.status == ESP_SPP_SUCCESS) {
-            bt2uart_event_t event = {
-                .type = LUCAS_EVENT_SPP_WRITE_SUCCEEDED,
+            bt2uart_event_send(&(bt2uart_event_t) {
+                .type = BT2UART_EVENT_SPP_WRITE_SUCCEEDED,
                 .write_succeeded = {
                     .num_bytes_written = param->write.len,
                     .congested = param->write.cong,
-                }
-            };
-            bt2uart_event_send(&event);
+                },
+            });
         } else {
             LOGE("write failed");
             if (!param->cong.cong) {
                 // the write failed but not because of congestion, try again straight away.
                 // otherwise, on congestion, we'll retry when `ESP_SPP_CONG_EVT` tells us that the congestion is over
-                LUCAS_EVENT_SEND(LUCAS_EVENT_SPP_WRITE_AGAIN);
+                bt2uart_event_send(&(bt2uart_event_t) {
+                    .type = BT2UART_EVENT_SPP_WRITE_AGAIN,
+                });
             }
         }
 
@@ -114,21 +125,22 @@ static void spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t* param) {
         uint8_t* data = malloc(param->data_ind.len);
         memcpy(data, param->data_ind.data, param->data_ind.len);
 
-        bt2uart_event_t event = {
-            .type = LUCAS_EVENT_SPP_RECV,
+        bt2uart_event_send(&(bt2uart_event_t) {
+            .type = BT2UART_EVENT_SPP_RECV,
             .recv = {
                 .data = data,
                 .len = param->data_ind.len,
-            }
-        };
-        bt2uart_event_send(&event);
+            },
+        });
     } break;
     case ESP_SPP_CONG_EVT:
         LOGI("ESP_SPP_CONG_EVT");
         if (param->cong.status == ESP_SPP_SUCCESS) {
             // congestion is over!
             if (!param->cong.cong)
-                LUCAS_EVENT_SEND(LUCAS_EVENT_SPP_CONGESTION_ENDED);
+                bt2uart_event_send(&(bt2uart_event_t) {
+                    .type = BT2UART_EVENT_SPP_CONGESTION_ENDED,
+                });
         }
         break;
     case ESP_SPP_UNINIT_EVT:

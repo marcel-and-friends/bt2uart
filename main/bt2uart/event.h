@@ -5,29 +5,23 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define LUCAS_EVENT_SEND(t)                  \
-    do {                                     \
-        bt2uart_event_t event = { .type = t }; \
-        bt2uart_event_send(&event);            \
-    } while (0)
-
 enum bt2uart_event_type_t {
-    // data received through uart
-    LUCAS_EVENT_UART_RECV,
+    // Data received through uart
+    BT2UART_EVENT_UART_RECV,
 
-    // data received through bluetooth spp
-    LUCAS_EVENT_SPP_RECV,
+    // Data received through bluetooth spp
+    BT2UART_EVENT_SPP_RECV,
 
-    // last spp write was successful
-    LUCAS_EVENT_SPP_WRITE_SUCCEEDED,
+    // Last spp write was successful
+    BT2UART_EVENT_SPP_WRITE_SUCCEEDED,
 
-    // try writing again, either because of a previous write failure or because of congestion
-    LUCAS_EVENT_SPP_WRITE_AGAIN,
-    LUCAS_EVENT_SPP_CONGESTION_ENDED = LUCAS_EVENT_SPP_WRITE_AGAIN,
-    LUCAS_EVENT_SPP_WRITE_FAILED = LUCAS_EVENT_SPP_WRITE_AGAIN,
+    // Try writing again, either because of a previous write failure or because of congestion
+    BT2UART_EVENT_SPP_WRITE_AGAIN,
+    BT2UART_EVENT_SPP_CONGESTION_ENDED = BT2UART_EVENT_SPP_WRITE_AGAIN,
+    BT2UART_EVENT_SPP_WRITE_FAILED = BT2UART_EVENT_SPP_WRITE_AGAIN,
 
-    // clear the spp buffer
-    LUCAS_EVENT_SPP_CLEAR_BUFFER,
+    // Clear the spp buffer and reset the spp handle
+    BT2UART_EVENT_SPP_RESET,
 };
 
 typedef struct {
@@ -43,6 +37,10 @@ typedef struct {
             size_t num_bytes_written;
             bool congested;
         } write_succeeded;
+
+        struct {
+            uint32_t spp_handle;
+        } reset;
     };
 } bt2uart_event_t;
 

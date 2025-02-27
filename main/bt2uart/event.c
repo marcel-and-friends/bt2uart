@@ -1,5 +1,4 @@
 #include "event.h"
-#include <bt2uart/shared.h>
 #include <bt2uart/uart.h>
 #include <bt2uart/util/err.h>
 #include <bt2uart/util/fifo.h>
@@ -11,14 +10,13 @@
 
 struct event_loop_ctx_t {
     bt2uart_fifo_t spp_fifo_buffer;
+    uint32_t spp_handle;
+    bool spp_congested;
 };
 
 static QueueHandle_t s_event_queue = NULL;
 
 static void write_fifo_to_spp(bt2uart_fifo_t* fifo, uint32_t spp_handle) {
-    if (!spp_handle)
-        return;
-
     // SAFETY: this function deep copies the buffer internally,
     //         there's no need to worry about modifications to the fifo being made before the transfer is finished
     //         https://github.com/espressif/esp-idf/blob/release/v5.2/components/bt/host/bluedroid/btc/profile/std/spp/btc_spp.c#L1442C13-L1442C33
@@ -29,14 +27,13 @@ static void write_fifo_to_spp(bt2uart_fifo_t* fifo, uint32_t spp_handle) {
 static void event_loop(void* octx) {
     struct event_loop_ctx_t* ctx = octx;
 
-    bool spp_congested = false;
     bt2uart_event_t event;
     while (true) {
         xQueueReceive(s_event_queue, &event, portMAX_DELAY);
 
         switch (event.type) {
-        case LUCAS_EVENT_UART_RECV:
-            if (!g_shared_ctx.spp_handle) {
+        case BT2UART_EVENT_UART_RECV:
+            if (!ctx->spp_handle) {
                 free(event.recv.data);
                 break;
             }
@@ -47,51 +44,52 @@ static void event_loop(void* octx) {
 
             // if there's no data currently buffered begin writing straight away
             // NOTE: this has to be evaluated before `bt2uart_fifo_push` so that the len is not affected by the push.
-            bool write_straight_away = ctx->spp_fifo_buffer.len == 0 && !spp_congested;
+            bool write_straight_away = ctx->spp_fifo_buffer.len == 0 && !ctx->spp_congested;
             bt2uart_fifo_push(&ctx->spp_fifo_buffer, event.recv.data, event.recv.len);
             if (write_straight_away)
-                write_fifo_to_spp(&ctx->spp_fifo_buffer, g_shared_ctx.spp_handle);
+                write_fifo_to_spp(&ctx->spp_fifo_buffer, ctx->spp_handle);
 
             free(event.recv.data);
             break;
-        case LUCAS_EVENT_SPP_RECV:
-            assert(event.recv.data && event.recv.len && event.recv.len <= LUCAS_UART_BUFFER_SIZE);
+        case BT2UART_EVENT_SPP_RECV:
+            assert(event.recv.data && event.recv.len && event.recv.len <= UART_BUFFER_SIZE);
 
             LOGI("received spp data [%zu bytes]", event.recv.len);
-            uart_write_bytes(LUCAS_UART_PORT, event.recv.data, event.recv.len);
+            LOG_ERR(uart_write_bytes(UART_PORT, event.recv.data, event.recv.len));
 
             free(event.recv.data);
             break;
-        case LUCAS_EVENT_SPP_WRITE_SUCCEEDED:
-            assert(ctx->spp_fifo_buffer.len && event.write_succeeded.num_bytes_written <= ctx->spp_fifo_buffer.len && !spp_congested);
+        case BT2UART_EVENT_SPP_WRITE_SUCCEEDED:
+            assert(ctx->spp_fifo_buffer.len && event.write_succeeded.num_bytes_written <= ctx->spp_fifo_buffer.len && !ctx->spp_congested);
 
             LOGI("sucessful spp write [%zu bytes - %zu left]", event.write_succeeded.num_bytes_written, ctx->spp_fifo_buffer.len - event.write_succeeded.num_bytes_written);
 
             // pop the bytes that were written
             bt2uart_fifo_pop(&ctx->spp_fifo_buffer, event.write_succeeded.num_bytes_written);
 
-            spp_congested = event.write_succeeded.congested;
-            if (!spp_congested && ctx->spp_fifo_buffer.len) {
+            ctx->spp_congested = event.write_succeeded.congested;
+            if (!ctx->spp_congested && ctx->spp_fifo_buffer.len) {
                 LOGI("continuing spp write [%zu bytes]", ctx->spp_fifo_buffer.len);
-                write_fifo_to_spp(&ctx->spp_fifo_buffer, g_shared_ctx.spp_handle);
+                write_fifo_to_spp(&ctx->spp_fifo_buffer, ctx->spp_handle);
             }
 
             break;
-        case LUCAS_EVENT_SPP_WRITE_AGAIN:
+        case BT2UART_EVENT_SPP_WRITE_AGAIN:
             assert(ctx->spp_fifo_buffer.len);
 
             // receiving this event definitely means that there's no congestion,
             // either because a congestion has ended (see `ESP_SPP_WRITE_EVT` handling),
             // or because the last write failed but *not* because of congestion.
-            spp_congested = false;
+            ctx->spp_congested = false;
 
             LOGW("retrying to write spp data [%zu bytes]", ctx->spp_fifo_buffer.len);
-            write_fifo_to_spp(&ctx->spp_fifo_buffer, g_shared_ctx.spp_handle);
+            write_fifo_to_spp(&ctx->spp_fifo_buffer, ctx->spp_handle);
 
             break;
-        case LUCAS_EVENT_SPP_CLEAR_BUFFER:
+        case BT2UART_EVENT_SPP_RESET:
             LOGW("cleared spp buffer [%zu bytes]", ctx->spp_fifo_buffer.len);
             bt2uart_fifo_clear(&ctx->spp_fifo_buffer);
+            ctx->spp_handle = event.reset.spp_handle;
 
             break;
         }
@@ -107,7 +105,7 @@ esp_err_t bt2uart_event_loop_init() {
     //       this object has to live as long as the task itself, which is forever
     static struct event_loop_ctx_t ctx = { 0 };
 
-    if (!bt2uart_fifo_init(&ctx.spp_fifo_buffer, LUCAS_UART_BUFFER_SIZE))
+    if (!bt2uart_fifo_init(&ctx.spp_fifo_buffer, UART_PORT))
         return ESP_ERR_NO_MEM;
 
     s_event_queue = xQueueCreate(20, sizeof(bt2uart_event_t));

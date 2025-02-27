@@ -5,7 +5,6 @@ idf_component_register(
         "bt2uart/bt.c"
         "bt2uart/event.c"
         "bt2uart/bt2uart.c"
-        "bt2uart/shared.c"
         "bt2uart/uart.c"
     INCLUDE_DIRS 
         "."
