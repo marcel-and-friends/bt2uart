@@ -106,7 +106,7 @@ static void spp_cb(esp_spp_cb_event_t event, esp_spp_cb_param_t* param) {
             });
         } else {
             LOGE("write failed");
-            if (!param->cong.cong) {
+            if (!param->write.cong) {
                 // the write failed but not because of congestion, try again straight away.
                 // otherwise, on congestion, we'll retry when `ESP_SPP_CONG_EVT` tells us that the congestion is over
                 bt2uart_event_send(&(bt2uart_event_t) {
