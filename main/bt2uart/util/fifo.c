@@ -5,6 +5,9 @@
 #include <string.h>
 
 esp_err_t bt2uart_fifo_init(bt2uart_fifo_t* this, size_t initial_cap) {
+    if (initial_cap == 0)
+        initial_cap = 1;
+
     this->data = malloc(initial_cap);
     if (this->data == NULL)
         return ESP_ERR_NO_MEM;
@@ -24,7 +27,7 @@ void bt2uart_fifo_free(bt2uart_fifo_t* this) {
     memset(this, 0, sizeof(bt2uart_fifo_t));
 }
 
-void bt2uart_fifo_push(bt2uart_fifo_t* this, uint8_t* data, size_t len) {
+void bt2uart_fifo_push(bt2uart_fifo_t* this, const uint8_t* data, size_t len) {
     if (len == 0)
         return;
 

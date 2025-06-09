@@ -113,7 +113,7 @@ esp_err_t bt2uart_event_loop_init() {
     static struct event_loop_ctx_t ctx = { 0 };
 
     s_event_queue = xQueueCreateStatic(QUEUE_LENGTH, sizeof(bt2uart_event_t), s_event_queue_storage, &s_event_queue_data);
-    TRY(bt2uart_fifo_init(&ctx.spp_fifo_buffer, UART_PORT));
+    TRY(bt2uart_fifo_init(&ctx.spp_fifo_buffer, UART_BUFFER_SIZE));
     xTaskCreateStatic(event_loop, "MAIN", STACK_SIZE, &ctx, 16, s_task_stack, &s_task_data);
 
     return ESP_OK;

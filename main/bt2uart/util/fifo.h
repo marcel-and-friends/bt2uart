@@ -17,6 +17,6 @@ void bt2uart_fifo_free(bt2uart_fifo_t*);
 
 void bt2uart_fifo_clear(bt2uart_fifo_t*);
 
-void bt2uart_fifo_push(bt2uart_fifo_t*, uint8_t* data, size_t len);
+void bt2uart_fifo_push(bt2uart_fifo_t*, const uint8_t* data, size_t len);
 
 void bt2uart_fifo_pop(bt2uart_fifo_t*, size_t num);
