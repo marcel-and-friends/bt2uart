@@ -14,7 +14,7 @@ struct uart_event_loop_ctx_t {
 
 #define STACK_SIZE 4096
 static StaticTask_t s_task_data;
-static uint8_t s_task_stack[STACK_SIZE];
+static StackType_t s_task_stack[STACK_SIZE];
 
 static void uart_event_loop(void* octx) {
     struct uart_event_loop_ctx_t* ctx = octx;
