@@ -62,7 +62,8 @@ static void event_loop(void* octx) {
             assert(event.recv.data && event.recv.len && event.recv.len <= UART_BUFFER_SIZE);
 
             LOGI("received spp data [%zu bytes]", event.recv.len);
-            LOG_ERR(uart_write_bytes(UART_PORT, event.recv.data, event.recv.len));
+            if (uart_write_bytes(UART_PORT, event.recv.data, event.recv.len) == -1)
+                LOGE("failed to write spp bytes to uart");
 
             free(event.recv.data);
             break;
