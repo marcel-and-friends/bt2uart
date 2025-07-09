@@ -31,22 +31,22 @@ static void uart_event_loop(void* octx) {
 
             // SAFETY: the main event loop is responsible for freeing this
             uint8_t* data = malloc(event.size);
+            assert(data);
+
             memcpy(data, ctx->rx_buffer, event.size);
 
             bt2uart_event_send(&(bt2uart_event_t) {
                 .type = BT2UART_EVENT_UART_RECV,
-                .recv = { data, .len = event.size },
+                .recv = { data, event.size },
             });
             break;
         case UART_FIFO_OVF:
             LOGE("UART_FIFO_OVF");
             LOG_ERR(uart_flush_input(UART_PORT));
-            xQueueReset(ctx->event_queue);
             break;
         case UART_BUFFER_FULL:
             LOGE("UART_BUFFER_FULL");
             LOG_ERR(uart_flush_input(UART_PORT));
-            xQueueReset(ctx->event_queue);
             break;
         default:
             LOGW("unhandled uart event: %d", event.type);

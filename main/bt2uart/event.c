@@ -97,6 +97,7 @@ static void event_loop(void* octx) {
             LOGW("cleared spp buffer [%zu bytes]", ctx->spp_fifo_buffer.len);
             bt2uart_fifo_clear(&ctx->spp_fifo_buffer);
             ctx->spp_handle = event.reset.spp_handle;
+            ctx->spp_congested = false;
 
             break;
         }
