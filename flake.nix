@@ -1,31 +1,24 @@
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     nixpkgs-esp-dev = {
-      url = "github:mirrexagon/nixpkgs-esp-dev";
+      url = "github:iniw/nixpkgs-esp-dev";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
   outputs =
-    {
-      self,
-      nixpkgs,
-      flake-utils,
-      nixpkgs-esp-dev,
-    }:
-    flake-utils.lib.eachDefaultSystem (
+    inputs:
+    inputs.flake-utils.lib.eachDefaultSystem (
       system:
       let
-        overlays = [ (import "${nixpkgs-esp-dev}/overlay.nix") ];
-        pkgs = import nixpkgs { inherit system overlays; };
-        esp32-toolchain = pkgs.esp-idf-esp32.override {
-          rev = "f5c3654a1c2d2a01f7f67def7a0dc48e691f63c0";
-          sha256 = "sha256-cLBUuQS1Y4iLZT/kb5GI/X7JZfSqQzQUDy5ODC+O9wU=";
+        pkgs = import inputs.nixpkgs { inherit system; };
 
+        esp-idf = inputs.nixpkgs-esp-dev.packages.${system}.esp-idf-full.override {
           toolsToInclude = [
             "esp-clang"
+            "esp-rom-elfs"
             "xtensa-esp-elf"
           ];
         };
@@ -35,7 +28,7 @@
           packages = with pkgs; [
             cmake
             ninja
-            esp32-toolchain
+            esp-idf
           ];
         };
       }
