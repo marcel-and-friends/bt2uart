@@ -3,7 +3,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     nixpkgs-esp-dev = {
-      url = "github:iniw/nixpkgs-esp-dev";
+      url = "github:mirrexagon/nixpkgs-esp-dev";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
