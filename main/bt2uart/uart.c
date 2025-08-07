@@ -24,22 +24,25 @@ static void uart_event_loop(void* octx) {
         xQueueReceive(ctx->event_queue, &event, portMAX_DELAY);
 
         switch (event.type) {
-        case UART_DATA:
-            LOGI("UART [%zu]", event.size);
-            if (uart_read_bytes(UART_PORT, ctx->rx_buffer, event.size, portMAX_DELAY) <= 0)
+        case UART_DATA: {
+            size_t rx_buffer_len = 0;
+            uart_get_buffered_data_len(UART_PORT, &rx_buffer_len);
+
+            LOGI("UART [%zu]", rx_buffer_len);
+            if (uart_read_bytes(UART_PORT, ctx->rx_buffer, rx_buffer_len, portMAX_DELAY) <= 0)
                 break;
 
             // SAFETY: the main event loop is responsible for freeing this
-            uint8_t* data = malloc(event.size);
+            uint8_t* data = malloc(rx_buffer_len);
             assert(data);
 
-            memcpy(data, ctx->rx_buffer, event.size);
+            memcpy(data, ctx->rx_buffer, rx_buffer_len);
 
             bt2uart_event_send(&(bt2uart_event_t) {
                 .type = BT2UART_EVENT_UART_RECV,
-                .recv = { data, event.size },
+                .recv = { data, rx_buffer_len },
             });
-            break;
+        } break;
         case UART_FIFO_OVF:
             LOGE("UART_FIFO_OVF");
             LOG_ERR(uart_flush_input(UART_PORT));
