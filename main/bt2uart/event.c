@@ -41,13 +41,14 @@ static void event_loop(void* octx) {
         switch (event.type) {
         case BT2UART_EVENT_UART_RECV:
             if (!ctx->spp_handle) {
+                LOGW("UART_RECV - no bt connection");
                 free(event.recv.data);
                 break;
             }
 
             assert(event.recv.data && event.recv.len);
 
-            LOGI("received uart data \"%.*s\" [%zu bytes - %zu total]", (int)event.recv.len, event.recv.data, event.recv.len, ctx->spp_fifo_buffer.len);
+            LOGI("UART_RECV -\n%.*s\n(len = %zu | fifo = %zu)", (int)event.recv.len, event.recv.data, event.recv.len, ctx->spp_fifo_buffer.len);
 
             // if there's no data currently buffered begin writing straight away
             // NOTE: this has to be evaluated before `bt2uart_fifo_push` so that the len is not affected by the push.
@@ -61,41 +62,49 @@ static void event_loop(void* octx) {
         case BT2UART_EVENT_SPP_RECV:
             assert(event.recv.data && event.recv.len && event.recv.len <= UART_BUFFER_SIZE);
 
-            LOGI("received spp data [%zu bytes]", event.recv.len);
+            LOGI("SPP_RECV -\n%.*s\n(len = %zu)", event.recv.len, event.recv.data, event.recv.len);
+
             if (uart_write_bytes(UART_PORT, event.recv.data, event.recv.len) == -1)
                 LOGE("failed to write spp bytes to uart");
 
             free(event.recv.data);
             break;
         case BT2UART_EVENT_SPP_WRITE_SUCCEEDED:
-            assert(ctx->spp_fifo_buffer.len && event.write_succeeded.num_bytes_written <= ctx->spp_fifo_buffer.len && !ctx->spp_congested);
+            if (ctx->spp_fifo_buffer.len == 0) {
+                LOGE("SPP_WRITE_SUCCEEDED - fifo is empty");
+                break;
+            }
 
-            LOGI("sucessful spp write [%zu bytes - %zu left]", event.write_succeeded.num_bytes_written, ctx->spp_fifo_buffer.len - event.write_succeeded.num_bytes_written);
+            assert(event.write_succeeded.num_bytes_written <= ctx->spp_fifo_buffer.len && !ctx->spp_congested);
+
+            LOGI("SPP_WRITE_SUCCEEDED -\n%.*s\n(written = %zu | rem = %zu)", event.write_succeeded.num_bytes_written, ctx->spp_fifo_buffer.data, event.write_succeeded.num_bytes_written, ctx->spp_fifo_buffer.len - event.write_succeeded.num_bytes_written);
 
             // pop the bytes that were written
             bt2uart_fifo_pop(&ctx->spp_fifo_buffer, event.write_succeeded.num_bytes_written);
 
             ctx->spp_congested = event.write_succeeded.congested;
-            if (!ctx->spp_congested && ctx->spp_fifo_buffer.len) {
-                LOGI("continuing spp write [%zu bytes]", ctx->spp_fifo_buffer.len);
+            if (!ctx->spp_congested && ctx->spp_fifo_buffer.len)
                 write_fifo_to_spp(&ctx->spp_fifo_buffer, ctx->spp_handle);
-            }
 
             break;
         case BT2UART_EVENT_SPP_WRITE_AGAIN:
-            assert(ctx->spp_fifo_buffer.len);
+            if (ctx->spp_fifo_buffer.len == 0) {
+                LOGE("SPP_WRITE_AGAIN - fifo is empty");
+                break;
+            }
 
             // receiving this event definitely means that there's no congestion,
             // either because a congestion has ended (see `ESP_SPP_WRITE_EVT` handling),
             // or because the last write failed but *not* because of congestion.
             ctx->spp_congested = false;
 
-            LOGW("retrying to write spp data [%zu bytes]", ctx->spp_fifo_buffer.len);
+            LOGW("SPP_WRITE_AGAIN - fifo = %zu", ctx->spp_fifo_buffer.len);
             write_fifo_to_spp(&ctx->spp_fifo_buffer, ctx->spp_handle);
 
             break;
         case BT2UART_EVENT_SPP_RESET:
-            LOGW("cleared spp buffer [%zu bytes]", ctx->spp_fifo_buffer.len);
+            LOGW("SPP_RESET - fifo = %zu | handle = %u", ctx->spp_fifo_buffer.len, event.reset.spp_handle);
+
             bt2uart_fifo_clear(&ctx->spp_fifo_buffer);
             ctx->spp_handle = event.reset.spp_handle;
             ctx->spp_congested = false;
