@@ -14,9 +14,9 @@
 #include <nvs_flash.h>
 #include <string.h>
 
-#define PIN "sol"
-#define DEVICE_NAME "BT2UART"
-#define SERVER_NAME "BT2UART-SERVER"
+#define PIN "lucas-cafe"             /* SENHA */
+#define DEVICE_NAME "LUCAS-2"        /* LUCAS-{ID} */
+#define SERVER_NAME "LUCAS-2-SERVER" /* LUCAS-{ID}-SERVER */
 
 static const char* bda2str(const uint8_t* bda) {
     static char output[18] = { 0 };
