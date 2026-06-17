@@ -114,8 +114,14 @@ static void event_loop(void* octx) {
     }
 }
 
-void bt2uart_event_send(bt2uart_event_t* event) {
-    assert(xQueueSend(s_event_queue, event, portMAX_DELAY) == pdPASS);
+bool bt2uart_event_send(bt2uart_event_t* event) {
+    if (xQueueSend(s_event_queue, event, pdMS_TO_TICKS(50)) != pdPASS) {
+        LOGW("event queue full, dropping event type %d", event->type);
+        if (event->type == BT2UART_EVENT_UART_RECV || event->type == BT2UART_EVENT_SPP_RECV)
+            free(event->recv.data);
+        return false;
+    }
+    return true;
 }
 
 esp_err_t bt2uart_event_loop_init() {
