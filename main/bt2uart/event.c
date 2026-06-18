@@ -14,7 +14,7 @@ struct event_loop_ctx_t {
     bool spp_congested;
 };
 
-#define QUEUE_LENGTH 20
+#define QUEUE_LENGTH 64
 static QueueHandle_t s_event_queue;
 static StaticQueue_t s_event_queue_data;
 static uint8_t s_event_queue_storage[QUEUE_LENGTH * sizeof(bt2uart_event_t)];
