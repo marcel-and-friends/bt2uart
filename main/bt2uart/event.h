@@ -44,6 +44,6 @@ typedef struct {
     };
 } bt2uart_event_t;
 
-bool bt2uart_event_send(bt2uart_event_t*);
+void bt2uart_event_send(bt2uart_event_t*);
 
 esp_err_t bt2uart_event_loop_init();

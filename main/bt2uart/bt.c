@@ -15,8 +15,8 @@
 #include <string.h>
 
 #define PIN "lucas-cafe"              /* SENHA */
-#define DEVICE_NAME "LUCAS-15"        /* LUCAS-{ID} */
-#define SERVER_NAME "LUCAS-15-SERVER" /* LUCAS-{ID}-SERVER */
+#define DEVICE_NAME "LUCAS-XX"        /* LUCAS-{ID} — trocar antes de flashar */
+#define SERVER_NAME "LUCAS-XX-SERVER" /* LUCAS-{ID}-SERVER */
 
 static const char* bda2str(const uint8_t* bda) {
     static char output[18] = { 0 };
@@ -169,6 +169,8 @@ esp_err_t bt2uart_bt_init() {
     esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
     TRY(esp_bt_controller_init(&bt_cfg));
     TRY(esp_bt_controller_enable(bt_cfg.mode));
+
+    esp_bt_sleep_disable();
 
     TRY(esp_bluedroid_init_with_cfg(&bd_cfg));
     TRY(esp_bluedroid_enable());

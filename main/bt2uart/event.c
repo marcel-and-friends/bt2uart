@@ -114,17 +114,8 @@ static void event_loop(void* octx) {
     }
 }
 
-bool bt2uart_event_send(bt2uart_event_t* event) {
-    bool is_data = (event->type == BT2UART_EVENT_UART_RECV || event->type == BT2UART_EVENT_SPP_RECV);
-    TickType_t timeout = is_data ? pdMS_TO_TICKS(50) : pdMS_TO_TICKS(500);
-
-    if (xQueueSend(s_event_queue, event, timeout) != pdPASS) {
-        LOGW("event queue full, dropping event type %d", event->type);
-        if (is_data)
-            free(event->recv.data);
-        return false;
-    }
-    return true;
+void bt2uart_event_send(bt2uart_event_t* event) {
+    xQueueSend(s_event_queue, event, portMAX_DELAY);
 }
 
 esp_err_t bt2uart_event_loop_init() {
