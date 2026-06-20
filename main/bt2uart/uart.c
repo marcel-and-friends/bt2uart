@@ -73,7 +73,10 @@ esp_err_t bt2uart_uart_init() {
     };
     TRY(uart_param_config(UART_PORT, &uart_config));
     TRY(uart_set_pin(UART_PORT, 17, 16, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
-    TRY(uart_driver_install(UART_PORT, UART_BUFFER_SIZE, UART_BUFFER_SIZE, 20, &ctx.event_queue, 0));
+    // TX ring buffer set to 0 on purpose: TX is buffered in software (uart_tx_fifo
+    // in event.c) and flushed with the non-blocking uart_tx_chars, so the MAIN
+    // task never blocks waiting for the STM32 to drain.
+    TRY(uart_driver_install(UART_PORT, UART_BUFFER_SIZE, 0, 20, &ctx.event_queue, 0));
 
     xTaskCreateStatic(uart_event_loop, "UART", STACK_SIZE, &ctx, 20, s_task_stack, &s_task_data);
 
