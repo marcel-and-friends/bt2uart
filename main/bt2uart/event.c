@@ -10,6 +10,7 @@
 
 struct event_loop_ctx_t {
     bt2uart_fifo_t spp_fifo_buffer;
+    bt2uart_fifo_t uart_tx_fifo;
     uint32_t spp_handle;
     bool spp_congested;
 };
@@ -31,12 +32,34 @@ static void write_fifo_to_spp(bt2uart_fifo_t* fifo, uint32_t spp_handle) {
     LOG_ERR(esp_spp_write(spp_handle, fifo->len, fifo->data));
 }
 
+// Drains the SPP->UART fifo into the UART without ever blocking.
+// `uart_tx_chars` only writes what currently fits in the HW FIFO and returns
+// immediately, so the MAIN task never stalls on a slow STM32. A stall here
+// would back up the event queue and, because `bt2uart_event_send` blocks with
+// portMAX_DELAY, would freeze the bluedroid task — which is what was causing the
+// 5s BT link supervision timeouts (HCI_ERR_CONNECTION_TOUT). Bytes that don't
+// fit stay buffered in the (growing) fifo and are flushed on the next wake-up.
+static void drain_uart_tx(struct event_loop_ctx_t* ctx) {
+    while (ctx->uart_tx_fifo.len) {
+        int written = uart_tx_chars(UART_PORT, (const char*)ctx->uart_tx_fifo.data, ctx->uart_tx_fifo.len);
+        if (written <= 0)
+            break;
+        bt2uart_fifo_pop(&ctx->uart_tx_fifo, written);
+    }
+}
+
 static void event_loop(void* octx) {
     struct event_loop_ctx_t* ctx = octx;
 
     bt2uart_event_t event;
     while (true) {
-        xQueueReceive(s_event_queue, &event, portMAX_DELAY);
+        // when there are still UART bytes pending, wake up periodically to flush
+        // them; otherwise block until the next event.
+        TickType_t timeout = ctx->uart_tx_fifo.len ? pdMS_TO_TICKS(2) : portMAX_DELAY;
+        if (xQueueReceive(s_event_queue, &event, timeout) == pdFALSE) {
+            drain_uart_tx(ctx);
+            continue;
+        }
 
         switch (event.type) {
         case BT2UART_EVENT_UART_RECV:
@@ -64,10 +87,12 @@ static void event_loop(void* octx) {
 
             LOGI("SPP_RECV -\n%.*s\n(len = %zu)", event.recv.len, event.recv.data, event.recv.len);
 
-            if (uart_write_bytes(UART_PORT, event.recv.data, event.recv.len) == -1)
-                LOGE("failed to write spp bytes to uart");
-
+            // Buffer the bytes and flush them non-blocking. We never drop and
+            // never fragment (the fifo preserves byte order); we just refuse to
+            // block the task, unlike the old uart_write_bytes call.
+            bt2uart_fifo_push(&ctx->uart_tx_fifo, event.recv.data, event.recv.len);
             free(event.recv.data);
+            drain_uart_tx(ctx);
             break;
         case BT2UART_EVENT_SPP_WRITE_SUCCEEDED:
             if (ctx->spp_fifo_buffer.len == 0) {
@@ -106,6 +131,9 @@ static void event_loop(void* octx) {
             LOGW("SPP_RESET - fifo = %zu | handle = %u", ctx->spp_fifo_buffer.len, event.reset.spp_handle);
 
             bt2uart_fifo_clear(&ctx->spp_fifo_buffer);
+            // also drop any half-sent command bound for the STM32 so a dropped
+            // connection never delivers a truncated line to the machine.
+            bt2uart_fifo_clear(&ctx->uart_tx_fifo);
             ctx->spp_handle = event.reset.spp_handle;
             ctx->spp_congested = false;
 
@@ -125,6 +153,7 @@ esp_err_t bt2uart_event_loop_init() {
 
     s_event_queue = xQueueCreateStatic(QUEUE_LENGTH, sizeof(bt2uart_event_t), s_event_queue_storage, &s_event_queue_data);
     TRY(bt2uart_fifo_init(&ctx.spp_fifo_buffer, UART_BUFFER_SIZE));
+    TRY(bt2uart_fifo_init(&ctx.uart_tx_fifo, UART_BUFFER_SIZE));
     xTaskCreateStatic(event_loop, "MAIN", STACK_SIZE, &ctx, 16, s_task_stack, &s_task_data);
 
     return ESP_OK;
