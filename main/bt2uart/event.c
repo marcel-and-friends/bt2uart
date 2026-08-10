@@ -7,6 +7,11 @@
 #include <esp_spp_api.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
+#include <stdio.h>
+
+// defined in bt.c
+extern const char* bt2uart_fw_version;
+extern const char* bt2uart_device_name;
 
 struct event_loop_ctx_t {
     bt2uart_fifo_t spp_fifo_buffer;
@@ -136,6 +141,19 @@ static void event_loop(void* octx) {
             bt2uart_fifo_clear(&ctx->uart_tx_fifo);
             ctx->spp_handle = event.reset.spp_handle;
             ctx->spp_congested = false;
+
+            // on new connection, send firmware version to the app
+            if (ctx->spp_handle) {
+                char version_msg[128];
+                int len = snprintf(version_msg, sizeof(version_msg),
+                    "#{"
+                    "\"fwVersion\":\"%s\","
+                    "\"deviceName\":\"%s\""
+                    "}#",
+                    bt2uart_fw_version, bt2uart_device_name);
+                bt2uart_fifo_push(&ctx->spp_fifo_buffer, (uint8_t*)version_msg, len);
+                write_fifo_to_spp(&ctx->spp_fifo_buffer, ctx->spp_handle);
+            }
 
             break;
         }

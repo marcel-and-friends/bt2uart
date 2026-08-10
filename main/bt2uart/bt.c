@@ -19,6 +19,9 @@
 #define DEVICE_NAME "LUCAS-XX"        /* LUCAS-{ID} — trocar antes de flashar */
 #define SERVER_NAME "LUCAS-XX-SERVER" /* LUCAS-{ID}-SERVER */
 
+const char* bt2uart_fw_version  = FW_VERSION;
+const char* bt2uart_device_name = DEVICE_NAME;
+
 static const char* bda2str(const uint8_t* bda) {
     static char output[18] = { 0 };
 
