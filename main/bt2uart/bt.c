@@ -14,6 +14,7 @@
 #include <nvs_flash.h>
 #include <string.h>
 
+#define FW_VERSION  "1.2.1"           /* bt2uart firmware version */
 #define PIN "lucas-cafe"              /* SENHA */
 #define DEVICE_NAME "LUCAS-XX"        /* LUCAS-{ID} — trocar antes de flashar */
 #define SERVER_NAME "LUCAS-XX-SERVER" /* LUCAS-{ID}-SERVER */
@@ -171,6 +172,8 @@ esp_err_t bt2uart_bt_init() {
     TRY(esp_bt_controller_enable(bt_cfg.mode));
 
     esp_bt_sleep_disable();
+
+    LOGI("bt2uart fw %s | device %s", FW_VERSION, DEVICE_NAME);
 
     TRY(esp_bluedroid_init_with_cfg(&bd_cfg));
     TRY(esp_bluedroid_enable());
