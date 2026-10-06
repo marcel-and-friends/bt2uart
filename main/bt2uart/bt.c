@@ -14,7 +14,7 @@
 #include <nvs_flash.h>
 #include <string.h>
 
-#define FW_VERSION  "1.2.1"           /* bt2uart firmware version */
+#define FW_VERSION  "1.2.2"           /* bt2uart firmware version — 1.2.2: keepalive contra sniff (event.c) */
 #define PIN "lucas-cafe"              /* SENHA */
 #define DEVICE_NAME "LUCAS-XX"        /* LUCAS-{ID} — trocar antes de flashar */
 #define SERVER_NAME "LUCAS-XX-SERVER" /* LUCAS-{ID}-SERVER */

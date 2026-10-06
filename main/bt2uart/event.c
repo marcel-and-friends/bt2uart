@@ -5,6 +5,7 @@
 #include <bt2uart/util/log.h>
 #include <driver/uart.h>
 #include <esp_spp_api.h>
+#include <esp_timer.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 #include <stdio.h>
@@ -13,12 +14,30 @@
 extern const char* bt2uart_fw_version;
 extern const char* bt2uart_device_name;
 
+// 1.2.2: keepalive do link. Bluetooth clássico entra em "sniff" (o rádio
+// cochila e só acorda em intervalos) depois de ~5 s sem tráfego — é a regra
+// padrão da pilha bluedroid para SPP (BTA_FTC_OPS_IDLE_TO_SNIFF_DELAY_MS = 5000)
+// e o Android faz o mesmo do lado dele. O primeiro pacote depois do cochilo
+// espera o rádio acordar: na bancada da m2 (06/10/2026, app de manutenção)
+// o primeiro clique de movimento após uma pausa levava ~1 s e os seguintes
+// eram imediatos. O app Lucas não sente porque o canal heating fala a cada
+// 2 s. Aqui a ponte garante isso para qualquer app: se nada passou pelo link
+// em KEEPALIVE_IDLE_MS, manda um '\n' (os leitores dos apps ignoram linha
+// vazia). Tráfego em qualquer direção conta como atividade.
+#define KEEPALIVE_TICK_MS 1000
+#define KEEPALIVE_IDLE_MS 3000
+
 struct event_loop_ctx_t {
     bt2uart_fifo_t spp_fifo_buffer;
     bt2uart_fifo_t uart_tx_fifo;
     uint32_t spp_handle;
     bool spp_congested;
+    int64_t last_link_activity_ms;
 };
+
+static int64_t now_ms(void) {
+    return esp_timer_get_time() / 1000;
+}
 
 #define QUEUE_LENGTH 64
 static QueueHandle_t s_event_queue;
@@ -84,6 +103,7 @@ static void event_loop(void* octx) {
             bt2uart_fifo_push(&ctx->spp_fifo_buffer, event.recv.data, event.recv.len);
             if (write_straight_away)
                 write_fifo_to_spp(&ctx->spp_fifo_buffer, ctx->spp_handle);
+            ctx->last_link_activity_ms = now_ms();
 
             free(event.recv.data);
             break;
@@ -91,6 +111,7 @@ static void event_loop(void* octx) {
             assert(event.recv.data && event.recv.len && event.recv.len <= UART_BUFFER_SIZE);
 
             LOGI("SPP_RECV -\n%.*s\n(len = %zu)", event.recv.len, event.recv.data, event.recv.len);
+            ctx->last_link_activity_ms = now_ms();
 
             // Buffer the bytes and flush them non-blocking. We never drop and
             // never fragment (the fifo preserves byte order); we just refuse to
@@ -153,8 +174,23 @@ static void event_loop(void* octx) {
                     bt2uart_fw_version, bt2uart_device_name);
                 bt2uart_fifo_push(&ctx->spp_fifo_buffer, (uint8_t*)version_msg, len);
                 write_fifo_to_spp(&ctx->spp_fifo_buffer, ctx->spp_handle);
+                ctx->last_link_activity_ms = now_ms();
             }
 
+            break;
+        case BT2UART_EVENT_KEEPALIVE_TICK:
+            // só com cliente conectado, nada pendente no fifo e link calado há
+            // KEEPALIVE_IDLE_MS. Com bytes pendentes/congestão o link já está ativo.
+            if (!ctx->spp_handle || ctx->spp_congested || ctx->spp_fifo_buffer.len)
+                break;
+            if (now_ms() - ctx->last_link_activity_ms < KEEPALIVE_IDLE_MS)
+                break;
+            {
+                static const uint8_t keepalive = '\n';
+                bt2uart_fifo_push(&ctx->spp_fifo_buffer, &keepalive, 1);
+                write_fifo_to_spp(&ctx->spp_fifo_buffer, ctx->spp_handle);
+                ctx->last_link_activity_ms = now_ms();
+            }
             break;
         }
     }
@@ -162,6 +198,13 @@ static void event_loop(void* octx) {
 
 void bt2uart_event_send(bt2uart_event_t* event) {
     xQueueSend(s_event_queue, event, portMAX_DELAY);
+}
+
+// roda na task do esp_timer: nunca bloqueia — se a fila estiver cheia o tick
+// é descartado (o próximo vem em 1 s)
+static void keepalive_timer_cb(void* arg) {
+    bt2uart_event_t event = { .type = BT2UART_EVENT_KEEPALIVE_TICK };
+    xQueueSend(s_event_queue, &event, 0);
 }
 
 esp_err_t bt2uart_event_loop_init() {
@@ -173,6 +216,14 @@ esp_err_t bt2uart_event_loop_init() {
     TRY(bt2uart_fifo_init(&ctx.spp_fifo_buffer, UART_BUFFER_SIZE));
     TRY(bt2uart_fifo_init(&ctx.uart_tx_fifo, UART_BUFFER_SIZE));
     xTaskCreateStatic(event_loop, "MAIN", STACK_SIZE, &ctx, 16, s_task_stack, &s_task_data);
+
+    const esp_timer_create_args_t keepalive_args = {
+        .callback = &keepalive_timer_cb,
+        .name = "bt_keepalive",
+    };
+    esp_timer_handle_t keepalive_timer;
+    TRY(esp_timer_create(&keepalive_args, &keepalive_timer));
+    TRY(esp_timer_start_periodic(keepalive_timer, (uint64_t)KEEPALIVE_TICK_MS * 1000));
 
     return ESP_OK;
 }

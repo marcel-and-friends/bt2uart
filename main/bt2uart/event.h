@@ -22,6 +22,10 @@ enum bt2uart_event_type_t {
 
     // Clear the spp buffer and reset the spp handle
     BT2UART_EVENT_SPP_RESET,
+
+    // 1.2.2: periodic tick; if the link has been silent for a while, send a
+    // keepalive so the radio never enters sniff mode (see event.c)
+    BT2UART_EVENT_KEEPALIVE_TICK,
 };
 
 typedef struct {
